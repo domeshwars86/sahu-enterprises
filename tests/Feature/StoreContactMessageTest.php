@@ -3,9 +3,16 @@
 namespace Tests\Feature;
 
 use App\Mail\NewContactMessage;
+use App\Models\AdminRole;
+use App\Models\BusinessSetting;
 use App\Models\ContactMessage;
+use App\Models\User;
+use App\Notifications\NewContactMessageNotification;
+use App\Services\Admin\DefaultAdminRoles;
+use App\Services\Contact\StoreContactMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class StoreContactMessageTest extends TestCase
@@ -45,6 +52,17 @@ class StoreContactMessageTest extends TestCase
         $this->assertDatabaseCount('contact_messages', 1);
     }
 
+    public function test_company_notifications_use_the_editable_business_email_when_no_override_is_configured(): void
+    {
+        Mail::fake();
+        config()->set('services.sahu.enquiry_to', null);
+        BusinessSetting::query()->create(['key' => 'email', 'value' => 'sahuenterprises0707@gmail.com']);
+
+        $this->postJson('/contact', $this->validMessage())->assertCreated();
+
+        Mail::assertSent(NewContactMessage::class, fn (NewContactMessage $mail): bool => $mail->hasTo('sahuenterprises0707@gmail.com'));
+    }
+
     public function test_contact_form_requires_privacy_consent_and_rejects_honeypot_submissions(): void
     {
         Mail::fake();
@@ -58,6 +76,35 @@ class StoreContactMessageTest extends TestCase
             ->assertJsonValidationErrors('website');
 
         $this->assertDatabaseCount('contact_messages', 0);
+    }
+
+    public function test_new_contact_request_notifies_support_only_once(): void
+    {
+        Mail::fake();
+        Notification::fake();
+        $definition = app(DefaultAdminRoles::class)->definitions()['customer-support'];
+        $role = AdminRole::query()->create(['name' => $definition['name'], 'slug' => 'customer-support', 'permissions' => $definition['permissions']]);
+        $support = User::factory()->create(['admin_role_id' => $role->id, 'is_active' => true]);
+        $payload = $this->validMessage();
+
+        $this->postJson('/contact', $payload)->assertCreated();
+        $this->postJson('/contact', $payload)->assertOk();
+
+        Notification::assertSentToTimes($support, NewContactMessageNotification::class, 1);
+    }
+
+    public function test_contact_message_inbox_masks_sensitive_fields_without_permission(): void
+    {
+        $definition = app(DefaultAdminRoles::class)->definitions()['sales-manager'];
+        $role = AdminRole::query()->create(['name' => $definition['name'], 'slug' => 'sales-manager', 'permissions' => $definition['permissions']]);
+        $manager = User::factory()->create(['admin_role_id' => $role->id, 'is_active' => true]);
+        $message = app(StoreContactMessage::class)->store($this->validMessage());
+
+        $this->actingAs($manager)->get('/admin/contact-messages')->assertInertia(fn ($page) => $page
+            ->where('messages.data.0.name', 'Asha …')
+            ->where('messages.data.0.email', 'a•••@example.com')
+            ->where('messages.data.0.message', null));
+        $this->assertDatabaseHas('contact_messages', ['id' => $message->id]);
     }
 
     /** @return array<string, mixed> */

@@ -14,3 +14,8 @@ Deployment has not occurred: this workspace contains no configured production ho
 8. Check logs/health, backup completion, scheduler execution, certificate renewal and rollback readiness.
 
 Never report a deployment as successful until the public host is reachable and smoke checks pass. The local build is not proof of a live deployment.
+# Admin and CRM release notes
+
+Deploy the additive CRM migration with a database backup in place: `php artisan migrate --force`. Never reset the production database. For an existing enquiry table, run `php artisan crm:index-enquiries` after migration to backfill exact-search fingerprints and one enquiry-linked customer record per existing enquiry. Create the owner account securely with `php artisan admin:create`; the command does not have default credentials. Configure SMTP for password resets and use HTTPS with secure session cookies. The privileged first login requires TOTP MFA enrollment.
+
+The local admin portal now covers authentication, MFA, role-gated dashboard/enquiry workflows, follow-ups, tasks, loan application tracking, staff, customers, products, partner records, sourced news, reports, and audit logs. This does not mean a production deployment has occurred. Review `ADMIN_TEST_REPORT.md` for unconfigured services and remaining product gaps before launch.

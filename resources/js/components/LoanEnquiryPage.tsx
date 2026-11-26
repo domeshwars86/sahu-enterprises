@@ -1,8 +1,27 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useHttp } from '@inertiajs/react';
+
+type EnquiryField = {
+    key: string;
+    label: string;
+    type: 'text' | 'number' | 'select';
+    required: boolean;
+    options?: Record<string, string>;
+};
+
+type LoanProduct = {
+    id?: number | null;
+    title: string;
+    slug: string;
+    desc: string;
+    category?: string;
+    categorySlug?: string;
+    enquiryFields?: EnquiryField[];
+};
 
 type EnquiryData = {
     idempotency_key: string;
+    product_slug: string;
     customer_name: string;
     mobile_number: string;
     email: string;
@@ -15,6 +34,7 @@ type EnquiryData = {
     vehicle_condition: string;
     vehicle_price: string;
     down_payment: string;
+    details: Record<string, string>;
     customer_notes: string;
     preferred_callback_time: string;
     contact_consent: boolean;
@@ -24,29 +44,23 @@ type EnquiryData = {
 
 type EnquiryResponse = { message: string; reference_number: string };
 
-const loanOptions = [
-    { label: 'Car loan', category: 'new_car', vehicle: 'car', condition: 'new' },
-    { label: 'Used vehicle loan', category: 'used_car', vehicle: 'car', condition: 'used' },
-    { label: 'Two-wheeler loan', category: 'two_wheeler', vehicle: 'two_wheeler', condition: 'new' },
-    { label: 'Commercial vehicle', category: 'commercial_vehicle', vehicle: 'commercial_vehicle', condition: 'new' },
-    { label: 'Vehicle refinance', category: 'vehicle_refinance', vehicle: 'car', condition: 'used' },
-];
-
-function initialData(): EnquiryData {
+function initialData(product: LoanProduct | undefined): EnquiryData {
     return {
         idempotency_key: crypto.randomUUID(),
+        product_slug: product?.slug.replace(/^\//, '') ?? '',
         customer_name: '',
         mobile_number: '',
         email: '',
         city: '',
-        loan_category: 'new_car',
+        loan_category: product?.categorySlug ?? 'new_car',
         requested_amount: '',
         preferred_tenure: '',
         employment_category: '',
-        vehicle_type: 'car',
-        vehicle_condition: 'new',
+        vehicle_type: '',
+        vehicle_condition: '',
         vehicle_price: '',
         down_payment: '',
+        details: {},
         customer_notes: '',
         preferred_callback_time: '',
         contact_consent: false,
@@ -55,15 +69,36 @@ function initialData(): EnquiryData {
     };
 }
 
-export default function LoanEnquiryPage() {
+function inputValue(data: EnquiryData, key: string): string {
+    return data.details[key] ?? '';
+}
+
+export default function LoanEnquiryPage({ loanProducts = [], companyName = 'SAHU ENTERPRISES' }: { loanProducts?: LoanProduct[]; companyName?: string }) {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSlug = params.get('product')?.replace(/^\//, '') ?? '';
+    const initialProduct = loanProducts.find(product => product.slug.replace(/^\//, '') === requestedSlug) ?? loanProducts[0];
     const formRef = useRef<HTMLFormElement>(null);
     const [step, setStep] = useState(1);
-    const [loan, setLoan] = useState(loanOptions[0]);
+    const [product, setProduct] = useState<LoanProduct | undefined>(initialProduct);
     const [referenceNumber, setReferenceNumber] = useState('');
     const [message, setMessage] = useState('');
-    const { data, setData, post, processing, errors, clearErrors } = useHttp<EnquiryData, EnquiryResponse>('post', '/apply', initialData());
+    const { data, setData, post, processing, errors, clearErrors } = useHttp<EnquiryData, EnquiryResponse>('post', '/apply', initialData(initialProduct));
+    const fields = useMemo(() => product?.enquiryFields ?? [], [product]);
 
     const update = <K extends keyof EnquiryData>(field: K, value: EnquiryData[K]) => setData(previous => ({ ...previous, [field]: value }));
+    const updateDetail = (key: string, value: string) => setData(previous => ({ ...previous, details: { ...previous.details, [key]: value } }));
+
+    function selectProduct(next: LoanProduct) {
+        setProduct(next);
+        setData(previous => ({
+            ...previous,
+            product_slug: next.slug.replace(/^\//, ''),
+            loan_category: next.categorySlug ?? 'vehicle_finance',
+            details: {},
+            vehicle_type: '',
+            vehicle_condition: '',
+        }));
+    }
 
     function continueStep() {
         clearErrors();
@@ -89,7 +124,7 @@ export default function LoanEnquiryPage() {
     }
 
     if (referenceNumber) {
-        return <section className="section form-section"><div className="form-card form-success" role="status"><span className="preview-icon">✓</span><span className="eyebrow">Enquiry received</span><h1>Thank you for contacting <em>Sahu Enterprises.</em></h1><p>{message}</p><div className="reference-number"><span>Your reference number</span><strong>{referenceNumber}</strong></div><p className="source-disclosure">A lending institution assesses every application and determines any offer and terms. Loan approval is not guaranteed.</p><Link className="button" href="/">Back to home</Link></div></section>;
+        return <section className="section form-section"><div className="form-card form-success" role="status"><span className="preview-icon">✓</span><span className="eyebrow">Enquiry received</span><h1>Thank you for contacting <em>{companyName}.</em></h1><p>{message}</p><div className="reference-number"><span>Your reference number</span><strong>{referenceNumber}</strong></div><p className="source-disclosure">A lending institution assesses every application and determines any offer and terms. Loan approval is not guaranteed.</p><Link className="button" href="/">Back to home</Link></div></section>;
     }
 
     return <>
@@ -108,21 +143,19 @@ export default function LoanEnquiryPage() {
                 {step === 1 && <>
                     <h2>What would you like<br/>help <em>exploring?</em></h2>
                     <div className="loan-choice-grid">
-                        {loanOptions.map(option => <button key={option.category} type="button" className={loan.category === option.category ? 'selected' : ''} aria-pressed={loan.category === option.category} onClick={() => { setLoan(option); update('loan_category', option.category); update('vehicle_type', option.vehicle); update('vehicle_condition', option.condition); }}><span>{loan.category === option.category ? '✓' : '↗'}</span>{option.label}</button>)}
+                        {loanProducts.map(option => <button key={option.slug} type="button" className={product?.slug === option.slug ? 'selected' : ''} aria-pressed={product?.slug === option.slug} onClick={() => selectProduct(option)}><span>{product?.slug === option.slug ? '✓' : '↗'}</span>{option.title}</button>)}
                     </div>
+                    {!loanProducts.length && <p>Our team can confirm current service availability before you share personal details.</p>}
                 </>}
                 {step === 2 && <>
                     <h2>Tell us a little<br/><em>about your plans.</em></h2>
                     <div className="input-grid">
                         <label>Approximate loan amount<input type="number" min="1" inputMode="numeric" placeholder="e.g. ₹8,00,000" value={data.requested_amount} onChange={event => update('requested_amount', event.target.value)} required/>{errors.requested_amount && <small className="form-error">{errors.requested_amount}</small>}</label>
                         <label>City<input placeholder="Your city" value={data.city} onChange={event => update('city', event.target.value)} required/>{errors.city && <small className="form-error">{errors.city}</small>}</label>
-                        <label>Vehicle type<select value={data.vehicle_type} onChange={event => update('vehicle_type', event.target.value)} required><option value="car">Car</option><option value="two_wheeler">Two-wheeler</option><option value="commercial_vehicle">Commercial vehicle</option></select></label>
-                        <label>Vehicle condition<select value={data.vehicle_condition} onChange={event => update('vehicle_condition', event.target.value)} required><option value="new">New</option><option value="used">Pre-owned</option></select></label>
-                        <label>Vehicle price <small>Optional</small><input type="number" min="1" inputMode="numeric" placeholder="Approximate price" value={data.vehicle_price} onChange={event => update('vehicle_price', event.target.value)}/></label>
-                        <label>Down payment <small>Optional</small><input type="number" min="0" inputMode="numeric" placeholder="Approximate down payment" value={data.down_payment} onChange={event => update('down_payment', event.target.value)}/></label>
-                        <label>Preferred tenure<select value={data.preferred_tenure} onChange={event => update('preferred_tenure', event.target.value)} required><option value="">Choose one</option><option>1–3 years</option><option>3–5 years</option><option>5+ years</option></select></label>
-                        <label>Employment category <small>Optional</small><select value={data.employment_category} onChange={event => update('employment_category', event.target.value)}><option value="">Choose one</option><option value="salaried">Salaried</option><option value="self_employed">Self-employed</option><option value="business_owner">Business owner</option><option value="other">Other</option></select></label>
+                        {fields.map(field => <label key={field.key}>{field.label}{field.type === 'select' ? <select value={inputValue(data, field.key)} onChange={event => updateDetail(field.key, event.target.value)} required={field.required}><option value="">Choose one</option>{Object.entries(field.options ?? {}).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select> : <input type={field.type === 'number' ? 'number' : 'text'} min={field.type === 'number' ? 0 : undefined} maxLength={field.type === 'text' ? 240 : undefined} placeholder={field.type === 'number' ? 'Approximate amount' : undefined} value={inputValue(data, field.key)} onChange={event => updateDetail(field.key, event.target.value)} required={field.required}/ >}{errors[`details.${field.key}`] && <small className="form-error">{errors[`details.${field.key}`]}</small>}</label>)}
+                        <label>Preferred repayment tenure <small>Optional where the product permits flexible repayment</small><select value={data.preferred_tenure} onChange={event => update('preferred_tenure', event.target.value)}><option value="">Not sure yet</option><option>1–3 years</option><option>3–5 years</option><option>5+ years</option></select></label>
                     </div>
+                    <p className="source-disclosure">Share broad estimates only. Do not include account numbers, identity numbers or document scans.</p>
                 </>}
                 {step === 3 && <>
                     <h2>How can we<br/><em>reach you?</em></h2>
@@ -135,8 +168,8 @@ export default function LoanEnquiryPage() {
                 </>}
                 {step === 4 && <>
                     <h2>Review your<br/><em>enquiry details.</em></h2>
-                    <div className="review-summary"><p><span>Loan type</span><b>{loan.label}</b></p><p><span>Requested amount</span><b>{data.requested_amount ? `₹${Number(data.requested_amount).toLocaleString('en-IN')}` : 'Not provided'}</b></p><p><span>City</span><b>{data.city}</b></p><p><span>Preferred tenure</span><b>{data.preferred_tenure}</b></p><p><span>Contact</span><b>{data.customer_name} · {data.mobile_number}</b></p></div>
-                    <label className="consent"><input type="checkbox" checked={data.contact_consent} onChange={event => update('contact_consent', event.target.checked)} required/> I consent to Sahu Enterprises using these details to respond to my enquiry. See the <Link href="/privacy-policy">Privacy Policy</Link>.</label>
+                    <div className="review-summary"><p><span>Loan type</span><b>{product?.title ?? 'Loan assistance'}</b></p><p><span>Requested amount</span><b>{data.requested_amount ? `₹${Number(data.requested_amount).toLocaleString('en-IN')}` : 'Not provided'}</b></p><p><span>City</span><b>{data.city}</b></p><p><span>Preferred tenure</span><b>{data.preferred_tenure || 'Not selected'}</b></p><p><span>Contact</span><b>{data.customer_name} · {data.mobile_number}</b></p></div>
+                    <label className="consent"><input type="checkbox" checked={data.contact_consent} onChange={event => update('contact_consent', event.target.checked)} required/> I consent to {companyName} using these details to respond to my enquiry. See the <Link href="/privacy-policy">Privacy Policy</Link>.</label>
                     <label className="consent"><input type="checkbox" checked={data.marketing_consent} onChange={event => update('marketing_consent', event.target.checked)}/> I would like to receive optional updates. (Optional)</label>
                     {errors.contact_consent && <small className="form-error">Consent is required so we can respond to this enquiry.</small>}
                     <div className="preview-banner">Your enquiry will be stored securely and used to respond to your request. You can choose separately whether to receive optional updates.</div>
@@ -145,7 +178,7 @@ export default function LoanEnquiryPage() {
                 {message && <div className="form-alert" role="alert">{message}</div>}
                 <div className="form-actions">
                     {step > 1 && <button type="button" className="button button-outline" onClick={() => { clearErrors(); setMessage(''); setStep(step - 1); }}>← Back</button>}
-                    <button type="button" className="button" onClick={continueStep} disabled={processing}>{processing ? 'Sending…' : step === 4 ? 'Send enquiry' : 'Continue'} <span>→</span></button>
+                    <button type="button" className="button" onClick={continueStep} disabled={processing || (step === 1 && !product)}>{processing ? 'Sending…' : step === 4 ? 'Send enquiry' : 'Continue'} <span>→</span></button>
                 </div>
             </form>
         </section>

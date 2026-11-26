@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreLoanEnquiryRequest;
 use App\Mail\LoanEnquiryReceived;
 use App\Mail\NewLoanEnquiry;
+use App\Services\BusinessProfile;
 use App\Services\LoanEnquiry\StoreLoanEnquiry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -13,12 +14,12 @@ use Throwable;
 
 class LoanEnquiryController extends Controller
 {
-    public function store(StoreLoanEnquiryRequest $request, StoreLoanEnquiry $storeLoanEnquiry): JsonResponse
+    public function store(StoreLoanEnquiryRequest $request, StoreLoanEnquiry $storeLoanEnquiry, BusinessProfile $businessProfile): JsonResponse
     {
         $enquiry = $storeLoanEnquiry->store($request->validated());
 
         if ($enquiry->wasRecentlyCreated) {
-            $companyEmail = config('services.sahu.enquiry_to');
+            $companyEmail = $businessProfile->notificationEmail();
 
             if ($companyEmail) {
                 try {

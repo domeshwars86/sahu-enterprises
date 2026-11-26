@@ -29,7 +29,7 @@ class LoanEnquiryOperationsTest extends TestCase
 
         $this->assertDatabaseHas('loan_enquiries', ['id' => $enquiry->id, 'status' => 'contacted']);
 
-        $this->artisan('enquiries:status', ['reference' => $enquiry->reference_number, 'status' => 'approved'])
+        $this->artisan('enquiries:status', ['reference' => $enquiry->reference_number, 'status' => 'not-a-status'])
             ->assertFailed();
     }
 

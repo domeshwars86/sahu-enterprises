@@ -1,0 +1,8 @@
+import React from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+
+type Props = { token: string; email: string };
+export default function ResetPassword({ token, email }: Props) {
+    const form = useForm({ token, email, password: '', password_confirmation: '' });
+    return <><Head title="Choose a new password · Admin"/><main className="admin-auth-simple"><form className="admin-auth-simple-card" onSubmit={event => { event.preventDefault(); form.post('/admin/reset-password'); }}><Link className="admin-brand" href="/admin/login"><span className="admin-brand-icon">S</span><span>SAHU ENTERPRISES<small>LOAN OPERATIONS</small></span></Link><span className="admin-login-eyebrow">ACCOUNT RECOVERY</span><h1>Choose a new password</h1><p>Use at least 14 characters with a mix of letters and numbers.</p>{form.errors.email && <div className="admin-error">{form.errors.email}</div>}<label>Email address<input type="email" autoComplete="username" required value={form.data.email} onChange={event => form.setData('email', event.target.value)}/></label><label>New password<input type="password" autoComplete="new-password" required value={form.data.password} onChange={event => form.setData('password', event.target.value)}/></label>{form.errors.password && <div className="admin-error">{form.errors.password}</div>}<label>Confirm new password<input type="password" autoComplete="new-password" required value={form.data.password_confirmation} onChange={event => form.setData('password_confirmation', event.target.value)}/></label><button className="admin-primary-button" disabled={form.processing}>Update password <span>→</span></button><Link className="admin-auth-back" href="/admin/login">← Return to sign in</Link></form></main></>;
+}

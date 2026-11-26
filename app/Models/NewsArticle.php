@@ -16,6 +16,7 @@ class NewsArticle extends Model
         'published_at',
         'fetched_at',
         'is_published',
+        'is_featured',
     ];
 
     protected function casts(): array
@@ -24,6 +25,7 @@ class NewsArticle extends Model
             'published_at' => 'immutable_datetime',
             'fetched_at' => 'immutable_datetime',
             'is_published' => 'boolean',
+            'is_featured' => 'boolean',
         ];
     }
 }

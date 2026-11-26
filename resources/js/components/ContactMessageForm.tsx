@@ -27,7 +27,7 @@ function initialData(): ContactData {
     };
 }
 
-export default function ContactMessageForm() {
+export default function ContactMessageForm({ companyName = 'SAHU ENTERPRISES' }: { companyName?: string }) {
     const [referenceNumber, setReferenceNumber] = useState('');
     const [status, setStatus] = useState('');
     const { data, setData, post, processing, errors } = useHttp<ContactData, ContactResponse>('post', '/contact', initialData());
@@ -84,7 +84,7 @@ export default function ContactMessageForm() {
                 {errors.message && <small role="alert">{errors.message}</small>}
             </label>
         </div>
-        <label className="consent"><input type="checkbox" required checked={data.privacy_consent} onChange={event => update('privacy_consent', event.target.checked)} /> <span>I agree that Sahu Enterprises may use these details to respond to my message under its <Link href="/privacy-policy">privacy notice</Link>.</span></label>
+        <label className="consent"><input type="checkbox" required checked={data.privacy_consent} onChange={event => update('privacy_consent', event.target.checked)} /> <span>I agree that {companyName} may use these details to respond to my message under its <Link href="/privacy-policy">privacy notice</Link>.</span></label>
         {errors.privacy_consent && <p className="form-error" role="alert">{errors.privacy_consent}</p>}
         <div className="honeypot" aria-hidden="true"><label htmlFor="contact-website">Leave this field empty<input id="contact-website" autoComplete="off" tabIndex={-1} value={data.website} onChange={event => update('website', event.target.value)} /></label></div>
         {status && <p className="form-error" role="status">{status}</p>}

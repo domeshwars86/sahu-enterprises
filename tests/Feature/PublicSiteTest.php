@@ -13,7 +13,17 @@ class PublicSiteTest extends TestCase
             ->component('Site')
             ->where('path', '/videos')
             ->has('loanProducts', 5)
-            ->where('businessConfig.name', 'Sahu Enterprises'));
+            ->where('businessConfig.name', 'SAHU ENTERPRISES')
+            ->where('businessConfig.proprietor', 'Khuleshwar Sahu')
+            ->where('businessConfig.phone', '+91 9131840194')
+            ->where('businessConfig.officePhone', '+91 8982868291')
+            ->where('businessConfig.whatsapp', '+91 9131840194')
+            ->where('businessConfig.email', 'sahuenterprises0707@gmail.com')
+            ->where('businessConfig.address', '327, 3rd Floor, Orbit Tower, Sunder Nagar')
+            ->where('businessConfig.city', 'Raipur')
+            ->where('businessConfig.state', 'Chhattisgarh')
+            ->where('businessConfig.postalCode', '492001')
+            ->where('businessConfig.directionsUrl', fn (string $url): bool => str_contains($url, 'google.com/maps/dir') && str_contains($url, 'destination=')));
 
         $this->get('/financial-resources')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Site')->where('path', '/financial-resources'));

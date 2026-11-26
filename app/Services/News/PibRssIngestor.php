@@ -2,10 +2,12 @@
 
 namespace App\Services\News;
 
+use App\Models\BusinessSetting;
 use App\Models\NewsArticle;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 use SimpleXMLElement;
@@ -15,7 +17,7 @@ class PibRssIngestor
 {
     public function ingest(): int
     {
-        if (! config('news.pib.enabled')) {
+        if (! config('news.pib.enabled') || (Schema::hasTable('business_settings') && BusinessSetting::query()->where('key', 'news_sync_enabled')->value('value') === '0')) {
             return 0;
         }
 

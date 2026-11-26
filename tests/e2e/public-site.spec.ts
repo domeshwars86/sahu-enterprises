@@ -6,8 +6,8 @@ test('homepage presents the vehicle finance experience', async ({ page }) => {
     await expect(page.getByRole('heading', { name: /your next big move/i })).toBeVisible();
     const loanCta = page.locator('.hero-actions a').first();
     await expect(loanCta).toHaveAttribute('href', '/loans/car-loan');
-    await expect(loanCta).toContainText(/explore car finance/i);
-    await page.locator('.hero-loan-option').nth(1).click();
+    await expect(loanCta).toContainText(/explore new car finance/i);
+    await page.locator('.hero-loan-option').nth(2).click();
     await expect(loanCta).toHaveAttribute('href', '/loans/two-wheeler-loan');
     await expect(loanCta).toContainText(/explore two-wheeler finance/i);
     await expect(page.getByRole('heading', { name: /recent updates, with source context/i })).toBeVisible();
@@ -43,7 +43,7 @@ test('enquiry validates, persists and confirms with a reference number', async (
     await page.getByPlaceholder('e.g. ₹8,00,000').fill('850000');
     await page.getByPlaceholder('Your city').fill('Pune');
     await page.getByLabel('Vehicle condition').selectOption('new');
-    await page.getByLabel('Preferred tenure').selectOption('3–5 years');
+    await page.getByLabel(/preferred repayment tenure/i).selectOption('3–5 years');
     await page.getByRole('button', { name: /continue/i }).click();
     await page.getByPlaceholder('Your name').fill('Test Customer');
     await page.getByPlaceholder('10-digit mobile number').fill('9876543210');
@@ -116,7 +116,7 @@ test('the required public routes render a page heading', async ({ page }) => {
         '/loans/commercial-vehicle-loan', '/loans/vehicle-refinance', '/loans/personal-loan',
         '/loans/business-loan', '/loans/home-loan', '/loans/loan-against-property', '/loans/balance-transfer',
         '/vehicle-finance', '/emi-calculator', '/compare-loans', '/apply', '/news', '/news/dsa',
-        '/news/banking', '/news/vehicle-finance', '/news/sample-story', '/resources',
+        '/news/banking', '/news/vehicle-finance', '/resources',
         '/resources/vehicle-loan-emi', '/resources/dsa-guide', '/resources/vehicle-finance-guide',
         '/resources/used-car-finance', '/resources/loan-tenure-guide', '/resources/vehicle-finance-documents',
         '/resources/credit-score-guide', '/resources/loan-processing-fees', '/resources/vehicle-refinancing-guide',
@@ -143,5 +143,61 @@ test('homepage, enquiry and news avoid horizontal overflow at key widths', async
             }));
             expect(dimensions.content, `${route} at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
         }
+    }
+});
+
+test('WhatsApp, click-to-call, email and map links are correct on desktop and mobile', async ({ page }) => {
+    for (const width of [1280, 375]) {
+        await page.setViewportSize({ width, height: 850 });
+        await page.goto('/');
+
+        const floating = page.getByRole('link', { name: /open whatsapp chat with sahu enterprises/i });
+        await expect(floating).toBeVisible();
+        await expect(floating).toHaveAttribute('target', '_blank');
+        const floatingUrl = new URL(await floating.getAttribute('href')!);
+        expect(floatingUrl.origin + floatingUrl.pathname).toBe('https://wa.me/919131840194');
+        expect(floatingUrl.searchParams.get('text')).toContain('Hello SAHU ENTERPRISES');
+        const viewport = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));
+        expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width);
+        const button = await floating.boundingBox();
+        expect(button).not.toBeNull();
+        expect(button!.x + button!.width).toBeLessThanOrEqual(width);
+
+        await page.goto('/loans/car-loan');
+        const productWhatsapp = page.getByRole('link', { name: /enquire on whatsapp/i }).first();
+        await expect(productWhatsapp).toBeVisible();
+        const productUrl = new URL(await productWhatsapp.getAttribute('href')!);
+        expect(productUrl.origin + productUrl.pathname).toBe('https://wa.me/919131840194');
+        expect(productUrl.searchParams.get('text')).toMatch(/assistance with a .*car loan/i);
+
+        for (const [route, service] of [
+            ['/loans/used-vehicle-loan', 'used car'],
+            ['/loans/two-wheeler-loan', 'two-wheeler'],
+            ['/loans/commercial-vehicle-loan', 'commercial vehicle'],
+            ['/loans/vehicle-refinance', 'vehicle refinance'],
+            ['/loans/personal-loan', 'personal loan'],
+            ['/loans/business-loan', 'business loan'],
+            ['/loans/home-loan', 'home loan'],
+            ['/loans/loan-against-property', 'loan against property'],
+        ]) {
+            await page.goto(route);
+            const serviceWhatsapp = page.locator('#main a.whatsapp-contact-button').first();
+            await expect(serviceWhatsapp, route).toBeVisible();
+            const serviceUrl = new URL(await serviceWhatsapp.getAttribute('href')!);
+            expect(serviceUrl.origin + serviceUrl.pathname, route).toBe('https://wa.me/919131840194');
+            expect(serviceUrl.searchParams.get('text'), route).toMatch(new RegExp(service, 'i'));
+        }
+
+        await page.goto('/contact');
+        await expect(page.locator('#main').getByRole('link', { name: /primary mobile: \+91 9131840194/i })).toHaveAttribute('href', 'tel:+919131840194');
+        await expect(page.locator('#main').getByRole('link', { name: /office: \+91 8982868291/i })).toHaveAttribute('href', 'tel:+918982868291');
+        await expect(page.locator('#main').getByRole('link', { name: 'sahuenterprises0707@gmail.com' })).toHaveAttribute('href', 'mailto:sahuenterprises0707@gmail.com');
+        await expect(page.locator('#main').getByRole('link', { name: /get directions in google maps/i })).toHaveAttribute('href', /google\.com\/maps\/dir\/.+destination=/);
+        await expect(page.locator('#main')).toContainText('327, 3rd Floor, Orbit Tower');
+        await expect(page.locator('#main')).toContainText('Raipur');
+        await expect(page.locator('#main')).toContainText('492001');
+        const contactWhatsapp = page.locator('#main .business-contact-card').getByRole('link', { name: /chat on whatsapp/i });
+        await expect(contactWhatsapp).toBeVisible();
+        expect(new URL(await contactWhatsapp.getAttribute('href')!).pathname).toBe('/919131840194');
     }
 });
